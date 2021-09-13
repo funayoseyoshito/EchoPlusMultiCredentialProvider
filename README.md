@@ -1,71 +1,75 @@
 ﻿# EchoPlusMultiCredentialProvider
 
-Bot Framework v4 echo bot sample.
+This is an example of code for use multiple Azure bot services.
 
 This bot has been created using [Bot Framework](https://dev.botframework.com), it shows how to create a simple bot that accepts input from the user and echoes it back.
 
-## Prerequisites
+## I created this code by following the steps below.
 
-- [.NET Core SDK](https://dotnet.microsoft.com/download) version 3.1
+* Download template
 
-  ```bash
-  # determine dotnet version
-  dotnet --version
-  ```
+```
+dotnet new echobot -lang C#
+```
 
-## To try this sample
+* Add MultiCredentialProvider
 
-- In a terminal, navigate to `EchoPlusMultiCredentialProvider`
+```CSharp
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.Bot.Connector.Authentication;
 
-    ```bash
-    # change into project folder
-    cd EchoPlusMultiCredentialProvider
-    ```
+namespace EchoBot
+{
+    public class MultiCredentialProvider : ICredentialProvider
+    {
+        public Dictionary<string, string> Credentials = new Dictionary<string, string>
+        {
+            { "{MicrosoftAppId}", "{MicrosoftAppPassword}" }, // bot1
+            { "{MicrosoftAppId}", "{MicrosoftAppPassword}" }  // bot2
+        };
 
-- Run the bot from a terminal or from Visual Studio, choose option A or B.
+        public Task<bool> IsValidAppIdAsync(string appId)
+        {
+            return Task.FromResult(this.Credentials.ContainsKey(appId));
+        }
 
-  A) From a terminal
+        public Task<string> GetAppPasswordAsync(string appId)
+        {
+            return Task.FromResult(this.Credentials.ContainsKey(appId) ? this.Credentials[appId] : null);
+        }
 
-  ```bash
-  # run the bot
-  dotnet run
-  ```
+        public Task<bool> IsAuthenticationDisabledAsync()
+        {
+            return Task.FromResult(!this.Credentials.Any());
+        }
+    }
+}
 
-  B) Or from Visual Studio
+```
 
-  - Launch Visual Studio
-  - File -> Open -> Project/Solution
-  - Navigate to `EchoPlusMultiCredentialProvider` folder
-  - Select `EchoPlusMultiCredentialProvider.csproj` file
-  - Press `F5` to run the project
+* Add Startup
 
-## Testing the bot using Bot Framework Emulator
+```CSharp
+        public void ConfigureServices(IServiceCollection services)
+        {
+            services.AddControllers().AddNewtonsoftJson();
 
-[Bot Framework Emulator](https://github.com/microsoft/botframework-emulator) is a desktop application that allows bot developers to test and debug their bots on localhost or running remotely through a tunnel.
+            services.AddSingleton<ICredentialProvider, MultiCredentialProvider>(); <= added
 
-- Install the Bot Framework Emulator version 4.9.0 or greater from [here](https://github.com/Microsoft/BotFramework-Emulator/releases)
+            // Create the Bot Framework Adapter with error handling enabled.
+            services.AddSingleton<IBotFrameworkHttpAdapter, AdapterWithErrorHandler>();
+```
 
-### Connect to the bot using Bot Framework Emulator
+* Change AdapterWithErrorHandler
+```CSharp
+        public AdapterWithErrorHandler(IConfiguration configuration, ILogger<BotFrameworkHttpAdapter> logger)
+            : base(configuration, logger)
+```
+↓
 
-- Launch Bot Framework Emulator
-- File -> Open Bot
-- Enter a Bot URL of `http://localhost:3978/api/messages`
-
-## Deploy the bot to Azure
-
-To learn more about deploying a bot to Azure, see [Deploy your bot to Azure](https://aka.ms/azuredeployment) for a complete list of deployment instructions.
-
-## Further reading
-
-- [Bot Framework Documentation](https://docs.botframework.com)
-- [Bot Basics](https://docs.microsoft.com/azure/bot-service/bot-builder-basics?view=azure-bot-service-4.0)
-- [Activity processing](https://docs.microsoft.com/en-us/azure/bot-service/bot-builder-concept-activity-processing?view=azure-bot-service-4.0)
-- [Azure Bot Service Introduction](https://docs.microsoft.com/azure/bot-service/bot-service-overview-introduction?view=azure-bot-service-4.0)
-- [Azure Bot Service Documentation](https://docs.microsoft.com/azure/bot-service/?view=azure-bot-service-4.0)
-- [.NET Core CLI tools](https://docs.microsoft.com/en-us/dotnet/core/tools/?tabs=netcore2x)
-- [Azure CLI](https://docs.microsoft.com/cli/azure/?view=azure-cli-latest)
-- [Azure Portal](https://portal.azure.com)
-- [Language Understanding using LUIS](https://docs.microsoft.com/en-us/azure/cognitive-services/luis/)
-- [Channels and Bot Connector Service](https://docs.microsoft.com/en-us/azure/bot-service/bot-concepts?view=azure-bot-service-4.0)
-
-Generated using `dotnet new echobot` v4.14.1
+```CSharp
+        public AdapterWithErrorHandler(ICredentialProvider credentialProvider, ILogger<BotFrameworkHttpAdapter> logger)
+            : base(credentialProvider)
+```
